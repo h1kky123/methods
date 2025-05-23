@@ -331,3 +331,112 @@ plt.title(' Графики аппроксимирующих функций и э
 plt.legend()
 plt.grid(True)
 plt.show()
+
+6.1
+import math
+import numpy as np
+from scipy.interpolate import CubicSpline
+from scipy.integrate import quad
+
+# Задание 1
+def erf_simp(x, n=1000):
+    if x == 0:
+        return 0.0
+    a, b = 0.0, x
+    h = (b - a) / n
+    s = math.exp(-a**2) + math.exp(-b**2)
+    s += sum(4 * math.exp(-(a + i * h) ** 2) for i in range(1, n, 2))
+    s += sum(2 * math.exp(-(a + i * h) ** 2) for i in range(2, n - 1, 2))
+    return (2 / math.sqrt(math.pi)) * (h / 3) * s
+
+print(f"{'x':>4} {'erf(x)':>14} {'math.erf':>14} {'Δ':>10}")
+print("-" * 46)
+for i in range(21):
+    x = i * 0.1
+    approx = erf_simp(x)
+    exact = math.erf(x)
+    print(f"{x:>4.1f} {approx:>14.10f} {exact:>14.10f} {abs(approx-exact):>10.2e}")
+
+# Задание 2 чать А
+def f_pi(x):  # 4 / (1 + x²)
+    return 4 / (1 + x * x)
+
+def left_rect(f, a, b, n):
+    h = (b - a) / n
+    return h * sum(f(a + i * h) for i in range(n))
+
+def right_rect(f, a, b, n):
+    h = (b - a) / n
+    return h * sum(f(a + (i + 1) * h) for i in range(n))
+
+def mid_rect(f, a, b, n):
+    h = (b - a) / n
+    return h * sum(f(a + (i + 0.5) * h) for i in range(n))
+
+def trapez(f, a, b, n):
+    h = (b - a) / n
+    return h * (0.5 * f(a) + 0.5 * f(b) +
+                sum(f(a + i * h) for i in range(1, n)))
+
+pi_true = math.pi
+ns = [8, 32, 128]
+
+def show(method_name, func):
+    print(f"\n{method_name}")
+    print(f"{'n':>5} {'h':>8} {'π':>16} {'|Δ|':>12} {'Δ/h²':>14}")
+    print("-" * 65)
+    for n in ns:
+        h = 1 / n
+        val = func(f_pi, 0, 1, n)
+        err = abs(val - pi_true)
+        print(f"{n:>5} {h:>8.5f} {val:>16.10f} {err:>12.10f} {err/h**2:>14.10f}")
+
+print("\nЗадание 2 часть А")
+show("Левые прямоугольники",   left_rect)
+show("Правые прямоугольники",  right_rect)
+show("Средние прямоугольники", mid_rect)
+show("Трапеции",               trapez)
+
+# Задание 2 часть Б
+print("\nЗадание 2 часть Б")
+print(f"{'n':>5} {'h':>8} {'π':>16} {'|Δ|':>12} {'Δ/h⁴':>18}")
+print("-" * 75)
+for n in ns:
+    h = 1 / n
+    x = np.linspace(0, 1, n + 1)
+    cs = CubicSpline(x, f_pi(x))
+    val, _ = quad(cs, 0, 1)
+    err = abs(val - pi_true)
+    print(f"{n:>5} {h:>8.5f} {val:>16.10f} {err:>12.10f} {err/h**4:>18.10f}")
+
+# Задание 3
+def f_piecewise(x):
+    if 0 <= x <= 2:
+        return math.exp(x * x)
+    if 2 < x <= 4:
+        return 1 / (4 - math.sin(16 * math.pi * x))
+    raise ValueError
+
+def simpson_interval(f, a, b):
+    c = (a + b) / 2
+    return (b - a) / 6 * (f(a) + 4 * f(c) + f(b))
+
+def adaptive(f, a, b, eps=1e-10, depth=0, max_depth=20):
+    mid = (a + b) / 2
+    S  = simpson_interval(f, a, b)
+    S1 = simpson_interval(f, a, mid)
+    S2 = simpson_interval(f, mid, b)
+    if depth >= max_depth or abs(S1 + S2 - S) < 15 * eps:
+        return S1 + S2 + (S1 + S2 - S) / 15
+    return (adaptive(f, a, mid, eps/2, depth+1) +
+            adaptive(f, mid, b, eps/2, depth+1))
+
+int_0_2 = adaptive(f_piecewise, 0, 2)
+int_2_4 = adaptive(f_piecewise, 2, 4)
+print("\nЗадание 3")
+print("Считаем отдельно: [0,2] для e^(x²) и (2,4] для 1/(4−sin16πx). "
+      "Используем метод адаптивный Симпсон, который сам уточняет шаг до нужной точности.")
+print(f"∫₀² e^(x²) dx      ≈ {int_0_2:.12f}")
+print(f"∫₂⁴ 1/(4-sin16πx) ≈ {int_2_4:.12f}")
+print("-" * 36)
+print(f"∫₀⁴ f(x) dx        ≈ {int_0_2 + int_2_4:.12f}")
