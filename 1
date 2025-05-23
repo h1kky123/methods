@@ -1,0 +1,333 @@
+5.1
+import matplotlib.pyplot as plt
+import math
+
+#Функция Рунге (исходная функция)
+def f(x):
+    return 1 / (1 + 25 * x ** 2)
+
+# Построение полинома Лагранжа
+def lagrange_polynom(x_nodes, y_nodes, x):
+    result = 0
+    n = len(x_nodes)
+    for i in range(n):
+        term = y_nodes[i]
+        for j in range(n):
+            if i != j:
+                term *= (x - x_nodes[j]) / (x_nodes[i] - x_nodes[j])
+        result += term
+    return result
+
+# Решение трёхдиагональной системы методом прогонки
+def solve_tridiagonal_system(a, b, c, d):
+    n = len(d)
+    c_prime = [0] * n
+    d_prime = [0] * n
+
+    c_prime[0] = c[0] / b[0]
+    d_prime[0] = d[0] / b[0]
+    for i in range(1, n):
+        denom = b[i] - a[i] * c_prime[i - 1]
+        if denom == 0:
+            raise ValueError("Ошибка деления на ноль")
+        c_prime[i] = c[i] / denom if i < n - 1 else 0
+        d_prime[i] = (d[i] - a[i] * d_prime[i - 1]) / denom
+
+    x = [0] * n
+
+    x[-1] = d_prime[-1]
+    for i in range(n - 2, -1, -1):
+        x[i] = d_prime[i] - c_prime[i] * x[i + 1]
+    return x
+
+
+# Вычисление коэффициентов второй производной (M) для кубического сплайна
+def cubic_spline(x_nodes, y_nodes):
+    n = len(x_nodes) - 1
+    h = [x_nodes[i+1] - x_nodes[i] for i in range(n)]
+
+    a = [h[i] for i in range(n - 1)]
+    b = [2 * (h[i] + h[i + 1]) for i in range(n - 1)]
+    c = [h[i + 1] for i in range(n - 1)]
+
+    d = [
+        3 * ((y_nodes[i + 2] - y_nodes[i + 1]) / h[i + 1] - (y_nodes[i + 1] - y_nodes[i]) / h[i])
+        for i in range(n - 1)
+    ]
+
+    M_inner = solve_tridiagonal_system(a, b, c, d)
+    M = [0] + M_inner + [0]
+    return M
+
+
+# Вычисление значения кубического сплайна S(x) в произвольной точке x
+def evaluate_spline(x_nodes, y_nodes, M, x):
+    n = len(x_nodes) - 1
+
+    for i in range(n):
+        if x_nodes[i] <= x <= x_nodes[i + 1]:
+            h = x_nodes[i + 1] - x_nodes[i]
+
+            A = (x_nodes[i + 1] - x) / h
+            B = (x - x_nodes[i]) / h
+
+            S = (
+                A * y_nodes[i] + B * y_nodes[i + 1] +
+                ((A ** 3 - A) * M[i] + (B ** 3 - B) * M[i + 1]) * (h ** 2) / 6
+            )
+
+            return S
+    return None
+
+# Равномерное разбиение точек
+def linspace(start, end, num):
+    if num == 1:
+        return [start]
+    step = (end - start) / (num - 1)
+    return [start + step * i for i in range(num)]
+
+# Построение графиков интерполяции полиномом Лагранжа с разными узлами
+def lagrange_interpolation_manual():
+    n_values = [5, 10, 15]  # Кол-во узлов интерполяции
+    x_plot = linspace(-1, 1, 2000)
+
+    plt.figure(figsize=(15, 10))
+
+
+    plt.subplot(2, 1, 1)
+    plt.title('Интерполяция Лагранжа (равноотстоящие узлы)')
+    plt.xlabel('x')
+    plt.ylabel('f(x)')
+    plt.plot(x_plot, [f(x) for x in x_plot], label='Исходная функция', linewidth=2)
+
+    for n in n_values:
+        x_nodes = linspace(-1, 1, n)
+        y_nodes = [f(x) for x in x_nodes]
+        y_plot = [lagrange_polynom(x_nodes, y_nodes, x) for x in x_plot]
+        plt.plot(x_plot, y_plot, '--', label=f'n = {n}')
+
+    plt.legend()
+    plt.grid()
+
+    # Интерполяция на узлах Чебышёва
+    plt.subplot(2, 1, 2)
+    plt.title('Интерполяция Лагранжа (чебышевские узлы)')
+    plt.xlabel('x')
+    plt.ylabel('f(x)')
+    plt.plot(x_plot, [f(x) for x in x_plot], label='Исходная функция', linewidth=2)
+
+    for n in n_values:
+        x_nodes = [math.cos((2 * k - 1) * math.pi / (2 * n)) for k in range(1, n + 1)]
+        y_nodes = [f(x) for x in x_nodes]
+        y_plot = [lagrange_polynom(x_nodes, y_nodes, x) for x in x_plot]
+        plt.plot(x_plot, y_plot, '--', label=f'n = {n}')
+
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    plt.show()
+
+    # Погрешности интерполяции
+    plt.figure(figsize=(15, 10))
+
+    # Погрешность при равноотстоящих узлах
+    plt.subplot(2, 1, 1)
+    plt.title('Отклонение Лагранжа (равноотстоящие узлы)')
+    plt.xlabel('x')
+    plt.ylabel('|P(x) - f(x)|')
+
+    for n in n_values:
+        x_nodes = linspace(-1, 1, n)
+        y_nodes = [f(x) for x in x_nodes]
+        deviation = [abs(lagrange_polynom(x_nodes, y_nodes, x) - f(x)) for x in x_plot]
+        plt.plot(x_plot, deviation, label=f'n = {n}')
+
+    plt.legend()
+    plt.grid()
+
+    plt.subplot(2, 1, 2)
+    plt.title('Отклонение Лагранжа (чебышевские узлы)')
+    plt.xlabel('x')
+    plt.ylabel('|P(x) - f(x)|')
+
+    for n in n_values:
+        x_nodes = [math.cos((2 * k - 1) * math.pi / (2 * n)) for k in range(1, n + 1)]
+        y_nodes = [f(x) for x in x_nodes]
+        deviation = [abs(lagrange_polynom(x_nodes, y_nodes, x) - f(x)) for x in x_plot]
+        plt.plot(x_plot, deviation, label=f'n = {n}')
+
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    plt.show()
+
+
+# Интерполяция кубическим сплайном
+def spline_interpolation_manual():
+    n_values = [5, 10, 50]
+    x_plot_func = linspace(-1, 1, 2000)  # значения для построения графика
+
+    plt.figure(figsize=(15, 10))
+
+    plt.subplot(2, 1, 1)
+    plt.title('Кубический сплайн для f(x) на [-1, 1]')
+    plt.xlabel('x')
+    plt.ylabel('f(x)')
+    plt.plot(x_plot_func, [f(x) for x in x_plot_func], label='Исходная функция', linewidth=2)
+
+    for n in n_values:
+        x_nodes = linspace(-1, 1, n)
+        y_nodes = [f(x) for x in x_nodes]
+        M = cubic_spline(x_nodes, y_nodes)
+        y_plot = [evaluate_spline(x_nodes, y_nodes, M, x) for x in x_plot_func]
+        plt.plot(x_plot_func, y_plot, '--', label=f'n = {n}')
+    plt.legend()
+    plt.grid()
+
+    plt.subplot(2, 1, 2)
+    plt.title('Отклонение сплайна')
+    plt.xlabel('x')
+    plt.ylabel('|S(x) - f(x)|')
+    for n in n_values:
+        x_nodes = linspace(-1, 1, n)
+        y_nodes = [f(x) for x in x_nodes]
+        M = cubic_spline(x_nodes, y_nodes)
+        deviation = [abs(evaluate_spline(x_nodes, y_nodes, M, x) - f(x)) for x in x_plot_func]
+        plt.plot(x_plot_func, deviation, label=f'n = {n}')
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    plt.show()
+
+    # Табличные данные
+    x_data = [2, 3, 5, 7]
+    y_data = [4, -2, 6, -3]
+    M = cubic_spline(x_data, y_data)
+
+
+    print("\nПроверка значений сплайна в узлах:")
+    for x_val, y_val in zip(x_data, y_data):
+        spline_val = evaluate_spline(x_data, y_data, M, x_val)
+        print(f"x = {x_val}: S({x_val}) = {spline_val:.4f}, f({x_val}) = {y_val}, разность = {abs(spline_val - y_val):.4f}")
+
+    x_plot_table = linspace(2, 7, 1000)
+    y_plot_table = [evaluate_spline(x_data, y_data, M, x) for x in x_plot_table]
+
+    plt.figure(figsize=(10, 6))
+    plt.title('Кубический сплайн для табличных данных')
+    plt.xlabel('x')
+    plt.ylabel('S(x)')
+    plt.plot(x_plot_table, y_plot_table, label='Сплайн')
+    plt.scatter(x_data, y_data, color='red', label='Узлы')
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+lagrange_interpolation_manual()
+spline_interpolation_manual()
+
+
+
+5.2
+import numpy as np
+import matplotlib.pyplot as plt
+
+x = np.array([1, 5, 9, 13, 17, 21], dtype=float)
+y = np.array([2.0, 3.4, 4.2, 4.6, 5.2, 5.4], dtype=float)
+n = x.size
+
+Sx   = x.sum()
+Sy   = y.sum()
+Sx2  = (x**2).sum()
+Sxy  = (x * y).sum()
+Delta_lin = n * Sx2 - Sx**2
+# Коэффициенты линейной аппроксимации
+a_lin  = (n * Sxy - Sx * Sy) / Delta_lin
+b_lin  = (Sx2 * Sy - Sx * Sxy) / Delta_lin
+print(f"Линейная модель: y = {a_lin:.2f} * x + {b_lin:.2f}")
+
+
+
+# Степенная аппроксимация: y = a * x^b
+X    = np.log(x)
+Y    = np.log(y)
+SX   = X.sum()
+SY   = Y.sum()
+SX2  = (X**2).sum()
+SXY  = (X * Y).sum()
+# Определитель нормальных уравнений
+Delta_pow = n * SX2 - SX**2
+
+# Вычисляем параметры
+b_pow      = (n * SXY - SX * SY) / Delta_pow
+ln_a_pow   = (SY * SX2 - SX * SXY) / Delta_pow
+
+# Возвращаем параметры в исходную форму
+a_pow      = np.exp(ln_a_pow)
+print(f"Степенная модель: y = {a_pow:.2f} * x^{b_pow:.2f}")
+
+# Показательная аппроксимация: y = a * exp(b * x)
+SY_e  = np.log(y).sum()
+Sxy_e = (x * np.log(y)).sum()
+
+Delta_exp = n * Sx2 - Sx * Sx
+
+# Параметры экспоненциальной модели
+b_exp    = (n * Sxy_e - Sx * SY_e) / Delta_exp
+ln_a_exp = (SY_e * Sx2 - Sx * Sxy_e) / Delta_exp
+a_exp    = np.exp(ln_a_exp)
+print(f"Показательная модель: y = {a_exp:.2f} * exp({b_exp:.2f} * x)")
+
+# Квадратичная аппроксимация: y = a * x^2 + b * x + c
+Sx3   = (x**3).sum()
+Sx4   = (x**4).sum()
+Sx2y  = ((x**2) * y).sum()
+
+# Матрица системы нормальных уравнений и вектор правой части
+A = np.array([
+    [Sx4, Sx3, Sx2],
+    [Sx3, Sx2, Sx],
+    [Sx2, Sx , n]
+])
+b_vec = np.array([Sx2y, Sxy, Sy])
+# Решаем систему относительно коэффициентов a, b, c
+a_quad, b_quad, c_quad = np.linalg.solve(A, b_vec)
+print(f"Квадратичная модель: y = {a_quad:.2f} * x^2 + {b_quad:.2f} * x + {c_quad:.2f}")
+
+
+# Сравнение сумм
+S_values = {
+    'Линейная': 1.36,
+    'Степенная': 1.38,
+    'Показательная': 3.24,
+    'Квадратичная': 0.41
+}
+
+best_model = min(S_values, key=S_values.get)
+best_S = S_values[best_model]
+
+print(f"\nСравнение сумм квадратов отклонений:")
+for model, S in S_values.items():
+    print(f"{model}: S(a, b) = {S}")
+print(f"\nНаилучшая модель: {best_model} с S(a, b) = {best_S}")
+
+# Построение графиков
+x_range = np.linspace(x.min(), x.max(), 200)
+y_lin_fit  = a_lin  * x_range + b_lin
+y_pow_fit  = a_pow  * x_range**b_pow
+y_exp_fit  = a_exp  * np.exp(b_exp * x_range)
+y_quad_fit = a_quad * x_range**2 + b_quad * x_range + c_quad
+
+# Построение графика
+plt.figure(figsize=(10, 6))
+plt.scatter(x, y, label='Исходные данные', marker='o')
+plt.plot(x_range, y_lin_fit,  label=f'Линейная: y={a_lin:.4f}x+{b_lin:.4f}')
+plt.plot(x_range, y_pow_fit,  label=f'Степенная: y={a_pow:.4f}x^{b_pow:.4f}')
+plt.plot(x_range, y_exp_fit,  label=f'Показательная: y={a_exp:.4f}e^({b_exp:.4f}x)')
+plt.plot(x_range, y_quad_fit, label=f'Квадратичная: y={a_quad:.4f}x²+{b_quad:.4f}x+{c_quad:.4f}')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title(' Графики аппроксимирующих функций и экспериментальные точки ')
+plt.legend()
+plt.grid(True)
+plt.show()
