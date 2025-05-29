@@ -440,3 +440,91 @@ print(f"∫₀² e^(x²) dx      ≈ {int_0_2:.12f}")
 print(f"∫₂⁴ 1/(4-sin16πx) ≈ {int_2_4:.12f}")
 print("-" * 36)
 print(f"∫₀⁴ f(x) dx        ≈ {int_0_2 + int_2_4:.12f}")
+
+
+
+
+
+1 Вывести имена пациентов и названия болезней, которыми они болеют, отсортированные по возрасту пациентов в порядке убывания.
+db.peopleNew.find({}, { name: 1, age: 1, diseases: 1 }).sort({ age: -1 });
+2 Вывести названия болезней и количество пациентов,
+страдающих каждой болезнью.
+db.peopleNew.aggregate([
+ { $unwind: "$diseases" },
+ { $group: { _id: "$diseases", count: { $sum: 1 } } }
+]);
+3  Вывести имена и возраст всех пациентов с диагнозом "Грипп", отсортированных по возрасту.
+const fluId = db.disease.findOne({ name: "Грипп" })._id;
+db.peopleNew.find({ diseases: fluId }, { name: 1, age: 1 }).sort({ age: 1 });
+4 Подсчитать количество назначений каждого лекарства.
+db.prescriptionNew.aggregate([
+ { $group: { _id: "$medication", count: { $sum: 1 } } }
+]);
+5 Найти врачей с максимальным опытом работы в каждой специальности.
+db.doctor.aggregate([
+ { $group: { _id: "$specialty", maxExperience: { $max: "$experience" } } }
+]);
+6 Найти средний возраст пациентов, страдающих каждой болезнью.
+db.peopleNew.aggregate([
+ { $unwind: "$diseases" },
+ { $group: { _id: "$diseases", avgAge: { $avg: "$age" } } }
+]);
+7 Найти болезни, которыми страдает больше всего людей.
+db.peopleNew.aggregate([
+ { $unwind: "$diseases" },
+ { $group: { _id: "$diseases", count: { $sum: 1 } } },
+ { $sort: { count: -1 } },
+ { $limit: 1 }
+]);
+8 Вывести специальности врачей, которые лечат более двух болезней (через назначения).
+db.prescriptionNew.aggregate([
+ { $group: { _id: "$doctor", diseaseCount: { $sum: 1 } } },
+ { $match: { diseaseCount: { $gt: 2 } } },
+ { $project: { _id: 0, specialty: "$_id" } }
+]);
+9 Найти пациентов, у которых есть хотя бы одна болезнь с тяжестью "Высокая".
+db.peopleNew.aggregate([
+ {
+   $match: {
+     diseases: {
+       $in: db.disease.aggregate([
+         { $match: { severity: "Высокая" } },
+         { $group: { _id: null, diseaseIds: { $push: "$_id" } } }
+       ]).next().diseaseIds
+     }
+   }
+ },
+ {
+   $project: { name: 1, _id: 0 }
+ }
+]);
+10 Найти всех врачей, которые выписывали лекарства для
+болезней с тяжестью "Высокая".
+db.doctor.find({
+   _id: {
+       $in: db.peopleNew.distinct("doctor", {
+           diseases: {
+               $in: db.disease.distinct("_id", { severity: "Высокая" })
+           }
+       })
+   }
+});
+
+11 Вывести имена пациентов и дозировку лекарств, которые им назначены, отсортированные по имени пациента.
+db.prescriptionNew.find({}, { medication: 1, dosage: 1, person: 1 }).sort({ person: 1 });
+ 
+  1 db.peopleNew.aggregate([
+  { $unwind: "$diseases" },
+  { $group: { _id: "$diseases", count: { $sum: 1 } } },
+  { $sort: { count: -1 } },
+  { $limit: 2 }
+]);
+2 const diseases = db.disease.find({ name: { $in: ["Грипп", "ОРВИ"] } }, { _id: 1 }).toArray().map(d => d._id);
+db.peopleNew.find(
+  { 
+    age: { $gt: 30 },
+    diseases: { $in: diseases }
+  },
+  { name: 1, age: 1, _id: 0 }
+).sort({ age: 1 }).limit(2);
+3
