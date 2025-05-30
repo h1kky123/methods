@@ -236,17 +236,15 @@ x = np.array([1, 5, 9, 13, 17, 21], dtype=float)
 y = np.array([2.0, 3.4, 4.2, 4.6, 5.2, 5.4], dtype=float)
 n = x.size
 
+# Линейная аппроксимация: y = a * x + b
 Sx   = x.sum()
 Sy   = y.sum()
 Sx2  = (x**2).sum()
 Sxy  = (x * y).sum()
 Delta_lin = n * Sx2 - Sx**2
-# Коэффициенты линейной аппроксимации
 a_lin  = (n * Sxy - Sx * Sy) / Delta_lin
 b_lin  = (Sx2 * Sy - Sx * Sxy) / Delta_lin
 print(f"Линейная модель: y = {a_lin:.2f} * x + {b_lin:.2f}")
-
-
 
 # Степенная аппроксимация: y = a * x^b
 X    = np.log(x)
@@ -255,24 +253,16 @@ SX   = X.sum()
 SY   = Y.sum()
 SX2  = (X**2).sum()
 SXY  = (X * Y).sum()
-# Определитель нормальных уравнений
 Delta_pow = n * SX2 - SX**2
-
-# Вычисляем параметры
 b_pow      = (n * SXY - SX * SY) / Delta_pow
 ln_a_pow   = (SY * SX2 - SX * SXY) / Delta_pow
-
-# Возвращаем параметры в исходную форму
 a_pow      = np.exp(ln_a_pow)
 print(f"Степенная модель: y = {a_pow:.2f} * x^{b_pow:.2f}")
 
 # Показательная аппроксимация: y = a * exp(b * x)
 SY_e  = np.log(y).sum()
 Sxy_e = (x * np.log(y)).sum()
-
 Delta_exp = n * Sx2 - Sx * Sx
-
-# Параметры экспоненциальной модели
 b_exp    = (n * Sxy_e - Sx * SY_e) / Delta_exp
 ln_a_exp = (SY_e * Sx2 - Sx * Sxy_e) / Delta_exp
 a_exp    = np.exp(ln_a_exp)
@@ -282,25 +272,32 @@ print(f"Показательная модель: y = {a_exp:.2f} * exp({b_exp:.2
 Sx3   = (x**3).sum()
 Sx4   = (x**4).sum()
 Sx2y  = ((x**2) * y).sum()
-
-# Матрица системы нормальных уравнений и вектор правой части
 A = np.array([
     [Sx4, Sx3, Sx2],
     [Sx3, Sx2, Sx],
     [Sx2, Sx , n]
 ])
 b_vec = np.array([Sx2y, Sxy, Sy])
-# Решаем систему относительно коэффициентов a, b, c
 a_quad, b_quad, c_quad = np.linalg.solve(A, b_vec)
 print(f"Квадратичная модель: y = {a_quad:.2f} * x^2 + {b_quad:.2f} * x + {c_quad:.2f}")
 
+# Вычисление сумм квадратов отклонений
+y_lin_pred  = a_lin * x + b_lin
+y_pow_pred  = a_pow * x**b_pow
+y_exp_pred  = a_exp * np.exp(b_exp * x)
+y_quad_pred = a_quad * x**2 + b_quad * x + c_quad
+
+S_lin  = ((y - y_lin_pred)**2).sum()
+S_pow  = ((y - y_pow_pred)**2).sum()
+S_exp  = ((y - y_exp_pred)**2).sum()
+S_quad = ((y - y_quad_pred)**2).sum()
 
 # Сравнение сумм
 S_values = {
-    'Линейная': 1.36,
-    'Степенная': 1.38,
-    'Показательная': 3.24,
-    'Квадратичная': 0.41
+    'Линейная': S_lin,
+    'Степенная': S_pow,
+    'Показательная': S_exp,
+    'Квадратичная': S_quad
 }
 
 best_model = min(S_values, key=S_values.get)
@@ -308,8 +305,8 @@ best_S = S_values[best_model]
 
 print(f"\nСравнение сумм квадратов отклонений:")
 for model, S in S_values.items():
-    print(f"{model}: S(a, b) = {S}")
-print(f"\nНаилучшая модель: {best_model} с S(a, b) = {best_S}")
+    print(f"{model}: S(a, b) = {S:.2f}")
+print(f"\nНаилучшая модель: {best_model} с S(a, b) = {best_S:.2f}")
 
 # Построение графиков
 x_range = np.linspace(x.min(), x.max(), 200)
